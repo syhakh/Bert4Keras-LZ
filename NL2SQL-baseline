@@ -5,9 +5,6 @@ import json
 import uniout
 import numpy as np
 import tensorflow as tf
-#from keras_bert import load_trained_model_from_checkpoint, Tokenizer
-#from keras_bert.tokenizer import Tokenizer
-#from keras_bert.loader import load_trained_model_from_checkpoint
 
 from bert4keras.models import build_transformer_model
 from bert4keras.tokenizers import Tokenizer
@@ -25,37 +22,24 @@ import re
 
 
 maxlen = 160
-num_agg = 7 # agg_sql_dict = {0:"", 1:"AVG", 2:"MAX", 3:"MIN", 4:"COUNT", 5:"SUM", 6:"不被select"}
-num_op = 5 # {0:">", 1:"<", 2:"==", 3:"!=", 4:"不被select"}
-num_cond_conn_op = 3 # conn_sql_dict = {0:"", 1:"and", 2:"or"}
 learning_rate = 5e-5
 min_learning_rate = 1e-5
 
-'''
-config_path = './kg/chinese_roberta_wwm_ext_L-12_H-768_A-12/bert_config.json'
-checkpoint_path = './kg/chinese_roberta_wwm_ext_L-12_H-768_A-12/bert_model.ckpt'
-dict_path = './kg/chinese_roberta_wwm_ext_L-12_H-768_A-12/vocab.txt'
-'''
+
+num_agg = 7 # agg_sql_dict = {0:"", 1:"AVG", 2:"MAX", 3:"MIN", 4:"COUNT", 5:"SUM", 6:"不被select"}
+num_op = 5 # {0:">", 1:"<", 2:"==", 3:"!=", 4:"不被select"}
+num_cond_conn_op = 3 # conn_sql_dict = {0:"", 1:"and", 2:"or"}
+
+
 config_path = './kg/albert_base_google_zh_additional_36k_steps/albert_config.json'
 checkpoint_path = './kg/albert_base_google_zh_additional_36k_steps/albert_model.ckpt'
 dict_path = './kg/albert_base_google_zh_additional_36k_steps/vocab.txt'
 
 
-'''
-config_path = './kg/chinese_rbt3_L-3_H-768_A-12/bert_config_rbt3.json'
-checkpoint_path = './kg/chinese_rbt3_L-3_H-768_A-12/bert_model.ckpt'
-dict_path = './kg/chinese_rbt3_L-3_H-768_A-12/vocab.txt'
-'''
 
 
 
 
-
-'''
-config_path = './kg/bert/chinese_wwm_L-12_H-768_A-12/publish/bert_config.json'
-checkpoint_path = './kg/bert/chinese_wwm_L-12_H-768_A-12/publish/bert_model.ckpt'
-dict_path = './kg/bert/chinese_wwm_L-12_H-768_A-12/publish/vocab.txt'
-'''
 
 
 
@@ -96,7 +80,7 @@ with codecs.open(dict_path, 'r', 'utf8') as reader: # dict_path   词典
         token = line.strip() #
         token_dict[token] = len(token_dict)
 
-
+# OurTokenizer way
 class OurTokenizer(Tokenizer):
     def _tokenize(self, text):
         R = []
@@ -226,9 +210,7 @@ def seq_gather(x):
 
 
 # 上述是模块的介绍，接下来是利用模块
-
 # 加载模块
-#bert_model = load_trained_model_from_checkpoint(config_path, checkpoint_path, seq_len=None)
 bert_model = build_transformer_model(config_path, checkpoint_path,model = 'albert')
 
 for l in bert_model.layers:
@@ -246,25 +228,23 @@ conn_in = Input(shape=(1,), dtype='int32') # 连接类型  shape=(?,1)
 csel_in = Input(shape=(None,),dtype='int32')  # 条件中的列 shape=(?,?)
 cop_in = Input(shape=(None,), dtype='int32') # 条件中的运算符（同时也是值的标记）shape=(?,?)
 
-x1, x2, xm, h, hm, sel, conn, csel, cop = (
-    x1_in, x2_in, xm_in, h_in, hm_in, sel_in, conn_in, csel_in, cop_in
-)
+x1, x2, xm, h, hm, sel, conn, csel, cop = 
+(x1_in, x2_in, xm_in, h_in, hm_in, sel_in, conn_in, csel_in, cop_in)
 
-# 第一个
+# 第一个部分
 hm = Lambda(lambda x: K.expand_dims(x, 1))(hm) # header的mask.shape=(None, 1, h_len)  #列名mask shape=(?,1,?)
-
 x = bert_model([x1_in, x2_in]) # bert的输入  shape=(?,?,768)
 x4conn = Lambda(lambda x: x[:, 0])(x)  # 对于bert的输入的处理 shape=(?,768)
-# 第二个
-pconn = Dense(num_cond_conn_op, activation='softmax')(x4conn)  # 连接类型的概率 conn shape=(?,3)
 
+# 第二个部分
+pconn = Dense(num_cond_conn_op, activation='softmax')(x4conn)  # 连接类型的概率 conn shape=(?,3)
 x4h = Lambda(seq_gather)([x, h])  # 列名所在位置  shape=(?,?,768)
-# 第三个
+
+# 第三个部分
 psel = Dense(num_agg, activation='softmax')(x4h) # 被选择列的概率 shape=(?,?,7)
 
-# 第四个
+# 第四个部分
 pcop = Dense(num_op, activation='softmax')(x)  # 被选择的条件中的运算符（同时也是值的标记）的概率 shape=(?,?,5)
-
 x = Lambda(lambda x: K.expand_dims(x, 2))(x)  #shape=(?,?,1,768)
 x4h = Lambda(lambda x: K.expand_dims(x, 1))(x4h) # 列名所在位置 shape=(?,1,?,768)
 
@@ -275,14 +255,11 @@ pcsel = Activation('tanh')(pcsel)
 pcsel = Dense(1)(pcsel)
 pcsel = Lambda(lambda x: x[0][..., 0] - (1 - x[1]) * 1e10)([pcsel, hm])  # mask 机制
 pcsel = Activation('softmax')(pcsel)  #shape=(?,?,?)
-a=111
+
 
 
 # 加载模型进行训练
-model = Model(
-    [x1_in, x2_in, h_in, hm_in],
-    [psel, pconn, pcop, pcsel]
-)
+model = Model([x1_in, x2_in, h_in, hm_in], [psel, pconn, pcop, pcsel])
 
 # 训练过程
 train_model = Model(
@@ -293,19 +270,16 @@ train_model = Model(
 xm = xm # question的mask.shape=(None, x_len)  # 输入序列的mask
 hm = hm[:, 0] # header的mask.shape=(None, h_len)
 cm = K.cast(K.not_equal(cop, num_op - 1), 'float32') # conds的mask.shape=(None, x_len)
-b=111
+
 # 主要是计算关于选择列，条件中欧的列，链接类型，条件中的操作符号损失函数
 psel_loss = K.sparse_categorical_crossentropy(sel_in, psel)  # sel_in=(?,?), psel=(?,?,7)
 psel_loss = K.sum(psel_loss * hm) / K.sum(hm)  #
 
 pconn_loss = K.sparse_categorical_crossentropy(conn_in, pconn)  #conn_in=(?,1), pconn=(?,3)
-pconn_loss = K.mean(pconn_loss)  # ？？？
+pconn_loss = K.mean(pconn_loss)  # 
 
 pcop_loss = K.sparse_categorical_crossentropy(cop_in, pcop)
 pcop_loss = K.sum(pcop_loss * xm) / K.sum(xm)
-
-
-
 
 
 pcsel_loss = K.sparse_categorical_crossentropy(csel, pcsel) # 主要问题 条件中选择的列  csel_in=(?,?),pcsel=(?,?,?)
@@ -318,7 +292,8 @@ train_model.summary()
 
 
 def nl2sql(question, table):
-    """输入question和headers，转SQL
+    """
+    输入question和headers，转SQL
     """
     x1, x2 = tokenizer.encode(question)
     h = []
@@ -384,7 +359,8 @@ def nl2sql(question, table):
 
 
 def is_equal(R1, R2):
-    """判断两个SQL字典是否全匹配
+    """
+    判断两个SQL字典是否全匹配
     """
     return (R1['cond_conn_op'] == R2['cond_conn_op']) &\
     (set(zip(R1['sel'], R1['agg'])) == set(zip(R2['sel'], R2['agg']))) &\
@@ -423,7 +399,7 @@ def test(data, tables, outfile='result.json'):
     F.close()
     pbar.close()
 
-# test(test_data, test_tables)
+# test(test_data, test_tables) # 测试部分
 
 
 class Evaluate(Callback):
@@ -452,7 +428,8 @@ class Evaluate(Callback):
             train_model.save_weights('best_model.weights')
         print('acc: %.5f, best acc: %.5f\n' % (acc, self.best))
     def evaluate(self):
-        return evaluate(valid_data, valid_tables)
+        return evaluate(valid_data, valid_tables) # 验证集部分
+        # return evaluate(test_data,test_tables) # 测试集部分
 
 
 train_D = data_generator(train_data, train_tables)
