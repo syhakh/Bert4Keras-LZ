@@ -36,16 +36,9 @@ checkpoint_path = './kg/albert_base_google_zh_additional_36k_steps/albert_model.
 dict_path = './kg/albert_base_google_zh_additional_36k_steps/vocab.txt'
 
 
-
-
-
-
-
-
-
 # one step:read file
 def read_data(data_file, table_file):  # data文件，数据表文件
-    data, tables = [], {}
+    data, tables = [], {} # 数据，表格
     with open(data_file) as f:
         for l in f:
             data.append(json.loads(l))
@@ -75,12 +68,12 @@ test_data, test_tables = read_data('./datasets/test/test.json', './datasets/test
 
 token_dict = {}
 
-with codecs.open(dict_path, 'r', 'utf8') as reader: # dict_path   词典
+with codecs.open(dict_path, 'r', 'utf8') as reader: # dict_path  词典
     for line in reader:
         token = line.strip() #
         token_dict[token] = len(token_dict)
 
-# OurTokenizer way
+# OurTokenizer 
 class OurTokenizer(Tokenizer):
     def _tokenize(self, text):
         R = []
@@ -145,18 +138,18 @@ class data_generator:
             X1, X2, XM, H, HM, SEL, CONN, CSEL, COP = [], [], [], [], [], [], [], [], []
             for i in idxs:
                 d = self.data[i] # d
-                t = self.tables[d['table_id']]['headers']  # 数据表表头
-                x1, x2 = tokenizer.encode(d['question']) # x1,x2 代表问题编码
+                t = self.tables[d['table_id']]['headers']  # 数据表header
+                x1, x2 = tokenizer.encode(d['question']) # x1,x2 代表自然问题编码
                 xm = [0] + [1] * len(d['question']) + [0]  # x 的mask 表示
-                h = [] #列名
-                for j in t:
+                h = [] # 列名
+                for j in t: # j 来自table
                     _x1, _x2 = tokenizer.encode(j) # 关于数据表头表示编码
                     h.append(len(x1))
-                    x1.extend(_x1)  # 添加数据表头编码
-                    x2.extend(_x2) # 添加数据表头编码
+                    x1.extend(_x1)  # 添加数据表头编码 indexs
+                    x2.extend(_x2) # 添加数据表头编码segemnt
                 hm = [1] * len(h)  # 列名mask
-                sel = [] # 被select的列 {count,min,max}
-                for j in range(len(h)):  # 列名的长度
+                sel = [] # 被select的列 {count, min, max}
+                for j in range(len(h)):  # 列名的长度 for循环根据h的长度
                     if j in d['sql']['sel']: # "sel": [7]
                         j = d['sql']['sel'].index(j)
                         sel.append(d['sql']['agg'][j]) # 添加编号{count,min,max} "agg": [0]
@@ -165,14 +158,14 @@ class data_generator:
                 conn = [d['sql']['cond_conn_op']]  #  连接类型 # "cond_conn_op": 0
                 csel = np.zeros(len(d['question']) + 2, dtype='int32') #  被选择的列，这里的0既表示padding，又表示第一列，padding部分训练时会被mask
                 cop = np.zeros(len(d['question']) + 2, dtype='int32') + num_op - 1 #  条件中的运算符（同时也是值的标记） 不被select则被标记为num_op-1
-                for j in d['sql']['conds']: # "conds": [[1, 2, "捷成股份"]]
+                for j in d['sql']['conds']: # "conds": [[1, 2, "捷成股份"]]  j  来自d['sql']['conds']
                     if j[2] not in d['question']:
                         j[2] = most_similar_2(j[2], d['question'])  # (，问题编码)
                     if j[2] not in d['question']:
                         continue
-                    k = d['question'].index(j[2])
-                    csel[k + 1: k + 1 + len(j[2])] = j[0]
-                    cop[k + 1: k + 1 + len(j[2])] = j[1]
+                    k = d['question'].index(j[2]) # k 值代表初始位置
+                    csel[k + 1: k + 1 + len(j[2])] = j[0] # 问题中列名[1,1,0,0,0,0]
+                    cop[k + 1: k + 1 + len(j[2])] = j[1]  # 运算符号[0,0,0,0,1,1]
                 if len(x1) > maxlen:
                     continue
                 X1.append(x1) # bert的输入
@@ -217,8 +210,8 @@ for l in bert_model.layers:
     l.trainable = True
 
 
-x1_in = Input(shape=(None,), dtype='int32') # bert的输入 shape=(?,?)
-x2_in = Input(shape=(None,)) # bert的输入 shape=(?,?)
+x1_in = Input(shape=(None,), dtype='int32') # bert的问题文本输入 shape=(?,?)
+x2_in = Input(shape=(None,)) # bert的问题文本输入 shape=(?,?)
 xm_in = Input(shape=(None,)) # 输入序列的mask  shape=(?,?)
 h_in = Input(shape=(None,), dtype='int32') # 列名所在位置  shape=(?,?)
 hm_in = Input(shape=(None,))  # 列名mask  shape=(?,?)
@@ -237,14 +230,18 @@ x = bert_model([x1_in, x2_in]) # bert的输入  shape=(?,?,768)
 x4conn = Lambda(lambda x: x[:, 0])(x)  # 对于bert的输入的处理 shape=(?,768)
 
 # 第二个部分
-pconn = Dense(num_cond_conn_op, activation='softmax')(x4conn)  # 连接类型的概率 conn shape=(?,3)
+pconn = Dense(num_cond_conn_op, activation='softmax')(x4conn)  # 连接类型的概率 conn shape=(?,3) {and or}
+
+
 x4h = Lambda(seq_gather)([x, h])  # 列名所在位置  shape=(?,?,768)
 
 # 第三个部分
-psel = Dense(num_agg, activation='softmax')(x4h) # 被选择列的概率 shape=(?,?,7)
+psel = Dense(num_agg, activation='softmax')(x4h) # 被选择列的概率 shape=(?,?,7) {}
 
 # 第四个部分
 pcop = Dense(num_op, activation='softmax')(x)  # 被选择的条件中的运算符（同时也是值的标记）的概率 shape=(?,?,5)
+
+
 x = Lambda(lambda x: K.expand_dims(x, 2))(x)  #shape=(?,?,1,768)
 x4h = Lambda(lambda x: K.expand_dims(x, 1))(x4h) # 列名所在位置 shape=(?,1,?,768)
 
@@ -258,16 +255,16 @@ pcsel = Activation('softmax')(pcsel)  #shape=(?,?,?)
 
 
 
-# 加载模型进行训练
+# 第一种模型 加载模型进行训练
 model = Model([x1_in, x2_in, h_in, hm_in], [psel, pconn, pcop, pcsel])
 
-# 训练过程
+# 第二种模型 训练过程
 train_model = Model(
     [x1_in, x2_in, xm_in, h_in, hm_in, sel_in, conn_in, csel_in, cop_in],
     [psel, pconn, pcop, pcsel]
 )
-
-xm = xm # question的mask.shape=(None, x_len)  # 输入序列的mask
+# 三个mask 文本mask，headermask，
+xm = xm  # question的mask.shape=(None, x_len)  # 输入序列的mask
 hm = hm[:, 0] # header的mask.shape=(None, h_len)
 cm = K.cast(K.not_equal(cop, num_op - 1), 'float32') # conds的mask.shape=(None, x_len)
 
@@ -374,7 +371,7 @@ def evaluate(data, tables): # valid_data, valid_tables
     for i, d in enumerate(data):
         question = d['question']
         table = tables[d['table_id']]
-        R = nl2sql(question, table)
+        R = nl2sql(question, table) # 调用nl2SQL的方法
         right += float(is_equal(R, d['sql']))
         pbar.update(1)
         pbar.set_description('< acc: %.5f >' % (right / (i + 1)))
