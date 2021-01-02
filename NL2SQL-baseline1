@@ -54,7 +54,9 @@ def read_data(data_file, table_file):  # data文件，数据表文件
             d['headers+type']=[]
             for i in range(len(d['headers'])):
                 d['headers+type'].append(d['headers'][i]+','+d['type'])  # 合并
-                
+             
+            d[headers+type2id] = {j: i for i, j in enumerate(d['headers+type'])}
+            
             d['content'] = {}
             d['all_values'] = set()
             rows = np.array(l['rows'])
@@ -364,7 +366,8 @@ def nl2sql(question, table):
             if k not in table['content'][h]:
                 for r, v in table['content'].items():
                     if k in v:
-                        i = table['header2id'][r]
+                        #i = table['header2id'][r]
+                        i = table['header2+type2id'][r]
                         break
         R['conds'].add((i, j, k))
     R['conds'] = list(R['conds'])
