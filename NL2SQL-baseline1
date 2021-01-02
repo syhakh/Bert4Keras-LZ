@@ -48,7 +48,13 @@ def read_data(data_file, table_file):  # data文件，数据表文件
             d['headers'] = l['header']  # column
             d['header2id'] = {j: i for i, j in enumerate(d['headers'])}
             
+            
             d['type'] = l['types'] # column types
+            
+            d['headers+type']=[]
+            for i in range(len(d['headers'])):
+                d['headers+type'].append(d['headers'][i]+','+d['type'])  # 合并
+                
             d['content'] = {}
             d['all_values'] = set()
             rows = np.array(l['rows'])
@@ -139,11 +145,18 @@ class data_generator:
             X1, X2, XM, H, HM, SEL, CONN, CSEL, COP = [], [], [], [], [], [], [], [], []
             for i in idxs:
                 d = self.data[i] # d
-                t = self.tables[d['table_id']]['headers']  # 数据表header
+                #t = self.tables[d['table_id']]['headers']  # 数据表header 能不能换成header+type
+                
+                t1 = self.tables[d['table_id']]['headers']  # 数据表header 能不能换成header+type
+                t2 = self.tables[d['table_id']]['types']  # 数据表header 能不能换成header+type
+                t_all=[]
+                for i in range(len(t1)):
+                   t_all.append(t1[i]+','+t2[i])
+                
                 x1, x2 = tokenizer.encode(d['question']) # x1,x2 代表自然问题编码
                 xm = [0] + [1] * len(d['question']) + [0]  # x 的mask 表示
                 h = [] # 列名
-                for j in t: # j 来自table
+                for j in t_all: # j 来自table  t换成t_all
                     _x1, _x2 = tokenizer.encode(j) # 关于数据表头表示编码
                     h.append(len(x1))
                     x1.extend(_x1)  # 添加数据表头编码 indexs
@@ -295,7 +308,12 @@ def nl2sql(question, table):
     """
     x1, x2 = tokenizer.encode(question)
     h = []
-    for i in table['headers']:
+    t1 = table['headers']
+    t2 = table['types']
+    t_all=[]
+    for i in range(len(t1):
+       t_all.append(t1[i]+','+t2[i])
+    for i in t_all: 能添加type信息 table['header']换成t_all
         _x1, _x2 = tokenizer.encode(i)
         h.append(len(x1))
         x1.extend(_x1)
@@ -340,7 +358,8 @@ def nl2sql(question, table):
             if k not in table['all_values']:
                 # 等号的值必须在table出现过，否则找一个最相近的
                 k = most_similar(k, list(table['all_values']))
-            h = table['headers'][i]
+            #h= table['headers'][i] # 能不能添加type信息
+            h = t_all[i]
             # 然后检查值对应的列是否正确，如果不正确，直接修正列名
             if k not in table['content'][h]:
                 for r, v in table['content'].items():
