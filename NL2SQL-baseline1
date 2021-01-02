@@ -156,7 +156,7 @@ class data_generator:
                 h = [] # 列名
                 for j in t_all: # j 来自table # t换成t_all
                     _x1, _x2 = tokenizer.encode(j) # 关于数据表头表示编码
-                    h.append(len(x1))
+                    h.append(len(x1)) # [7，7，7，7]
                     x1.extend(_x1)  # 添加数据表头编码 indexs
                     x2.extend(_x2) # 添加数据表头编码segemnt
                 hm = [1] * len(h)  # 列名mask
