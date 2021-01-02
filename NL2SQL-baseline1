@@ -38,33 +38,30 @@ dict_path = './kg/albert_base_google_zh_additional_36k_steps/vocab.txt'
 # one step:read file
 def read_data(data_file, table_file):  # data文件，数据表文件
     data, tables = [], {} # 数据，表格
-    with open(data_file) as f:
+    with open(data_file) as f: # 读取问题信息
         for l in f:
             data.append(json.loads(l))
-    with open(table_file) as f:
+    with open(table_file) as f: # 读取表格信息
         for l in f:
             l = json.loads(l)
             d = {}
             d['headers'] = l['header']  # column
             d['header2id'] = {j: i for i, j in enumerate(d['headers'])}
-            
-            
+            #############
             d['type'] = l['types'] # column types
-            
             d['headers+type']=[]
             for i in range(len(d['headers'])):
                 d['headers+type'].append(d['headers'][i]+','+d['type'])  # 合并
-             
             d[headers+type2id] = {j: i for i, j in enumerate(d['headers+type'])}
-            
+            #############
             d['content'] = {}
             d['all_values'] = set()
             rows = np.array(l['rows'])
             for i, h in enumerate(d['headers']):
-                d['content'][h] = set(rows[:, i])
+                d['content'][h] = set(rows[:, i]) # set 负责去重
                 d['all_values'].update(d['content'][h])
             d['all_values'] = set([i for i in d['all_values'] if hasattr(i, '__len__')])
-            tables[l['id']] = d
+            tables[l['id']] = d  # l['id']是表格编号 将所有表格信息汇总到tables={}
     return data, tables
 
 
@@ -148,7 +145,6 @@ class data_generator:
             for i in idxs:
                 d = self.data[i] # d
                 #t = self.tables[d['table_id']]['headers']  # 数据表header 能不能换成header+type
-                
                 t1 = self.tables[d['table_id']]['headers']  # 数据表header 能不能换成header+type
                 t2 = self.tables[d['table_id']]['types']  # 数据表header 能不能换成header+type
                 t_all=[]
@@ -158,7 +154,7 @@ class data_generator:
                 x1, x2 = tokenizer.encode(d['question']) # x1,x2 代表自然问题编码
                 xm = [0] + [1] * len(d['question']) + [0]  # x 的mask 表示
                 h = [] # 列名
-                for j in t_all: # j 来自table  t换成t_all
+                for j in t_all: # j 来自table # t换成t_all
                     _x1, _x2 = tokenizer.encode(j) # 关于数据表头表示编码
                     h.append(len(x1))
                     x1.extend(_x1)  # 添加数据表头编码 indexs
@@ -226,16 +222,16 @@ for l in bert_model.layers:
     l.trainable = True
 
 
-x1_in = Input(shape=(None,), dtype='int32') # bert的问题文本输入 shape=(?,?)
-x2_in = Input(shape=(None,)) # bert的问题文本输入 shape=(?,?)
-xm_in = Input(shape=(None,)) # 输入序列的mask  shape=(?,?)
-h_in = Input(shape=(None,), dtype='int32') # 列名所在位置  shape=(?,?)
-hm_in = Input(shape=(None,))  # 列名mask  shape=(?,?)
-sel_in = Input(shape=(None,), dtype='int32')   # 被select的列  shape=(?,?)
-conn_in = Input(shape=(1,), dtype='int32') # 连接类型  shape=(?,1)
-#csel_in = Input(shape=(None,), dtype='int32')  # 条件中的列 shape=(?,?)
-csel_in = Input(shape=(None,),dtype='int32')  # 条件中的列 shape=(?,?)
-cop_in = Input(shape=(None,), dtype='int32') # 条件中的运算符（同时也是值的标记）shape=(?,?)
+x1_in = Input(shape=(None,), dtype='int32') # 实例化张量 bert的问题文本输入 shape=(?,?)
+x2_in = Input(shape=(None,)) #实例化张量 bert的问题文本输入 shape=(?,?)
+xm_in = Input(shape=(None,)) #实例化张量 输入序列的mask  shape=(?,?)
+h_in = Input(shape=(None,), dtype='int32') #实例化张量 列名所在位置  shape=(?,?)
+hm_in = Input(shape=(None,))  #实例化张量 列名mask  shape=(?,?)
+sel_in = Input(shape=(None,), dtype='int32')   #实例化张量 被select的列  shape=(?,?)
+conn_in = Input(shape=(1,), dtype='int32') #实例化张量 连接类型  shape=(?,1)
+#csel_in = Input(shape=(None,), dtype='int32')  #实例化张量 条件中的列 shape=(?,?)
+csel_in = Input(shape=(None,),dtype='int32')  #实例化张量 条件中的列 shape=(?,?)
+cop_in = Input(shape=(None,), dtype='int32') #实例化张量 条件中的运算符（同时也是值的标记）shape=(?,?)
 
 x1, x2, xm, h, hm, sel, conn, csel, cop = 
 (x1_in, x2_in, xm_in, h_in, hm_in, sel_in, conn_in, csel_in, cop_in)
@@ -243,7 +239,7 @@ x1, x2, xm, h, hm, sel, conn, csel, cop =
 # 第一个部分
 hm = Lambda(lambda x: K.expand_dims(x, 1))(hm) # header的mask.shape=(None, 1, h_len)  #列名mask shape=(?,1,?)
 x = bert_model([x1_in, x2_in]) # bert的输入  shape=(?,?,768)
-x4conn = Lambda(lambda x: x[:, 0])(x)  # 对于bert的输入的处理 shape=(?,768)
+x4conn = Lambda(lambda x: x[:, 0])(x)  # 对于bert的输入的处理 shape=(?,768)  # 直接获取cls位置
 
 # 第二个部分
 pconn = Dense(num_cond_conn_op, activation='softmax')(x4conn)  # 连接类型的概率 conn shape=(?,3) {and or}
@@ -266,7 +262,7 @@ pcsel_2 = Dense(256)(x4h)  # 选择条件中的列的概率 shape=(?,1,?,256)
 pcsel = Lambda(lambda x: x[0] + x[1])([pcsel_1, pcsel_2]) # 选择条件中的列的概率
 pcsel = Activation('tanh')(pcsel)
 pcsel = Dense(1)(pcsel)
-pcsel = Lambda(lambda x: x[0][..., 0] - (1 - x[1]) * 1e10)([pcsel, hm])  # mask 机制
+pcsel = Lambda(lambda x: x[0][..., 0] - (1 - x[1]) * 1e10)([pcsel, hm])  # mask 机制 softmax机制
 pcsel = Activation('softmax')(pcsel)  #shape=(?,?,?)
 
 
@@ -286,17 +282,17 @@ cm = K.cast(K.not_equal(cop, num_op - 1), 'float32') # conds的mask.shape=(None,
 
 # 主要是计算关于选择列，条件中欧的列，链接类型，条件中的操作符号损失函数
 psel_loss = K.sparse_categorical_crossentropy(sel_in, psel)  # sel_in=(?,?), psel=(?,?,7)
-psel_loss = K.sum(psel_loss * hm) / K.sum(hm)  #
+psel_loss = K.sum(psel_loss * hm) / K.sum(hm)  #计算平均值
 
 pconn_loss = K.sparse_categorical_crossentropy(conn_in, pconn)  #conn_in=(?,1), pconn=(?,3)
-pconn_loss = K.mean(pconn_loss)  # 
+pconn_loss = K.mean(pconn_loss)  # #计算平均值
 
 pcop_loss = K.sparse_categorical_crossentropy(cop_in, pcop)
-pcop_loss = K.sum(pcop_loss * xm) / K.sum(xm)
+pcop_loss = K.sum(pcop_loss * xm) / K.sum(xm) #计算平均值
 
 
 pcsel_loss = K.sparse_categorical_crossentropy(csel, pcsel) # 主要问题 条件中选择的列  csel_in=(?,?),pcsel=(?,?,?)
-pcsel_loss = K.sum(pcsel_loss * xm * cm) / K.sum(xm * cm)
+pcsel_loss = K.sum(pcsel_loss * xm * cm) / K.sum(xm * cm) #计算平均值
 loss = psel_loss + pconn_loss + pcop_loss + pcsel_loss
 
 train_model.add_loss(loss)
