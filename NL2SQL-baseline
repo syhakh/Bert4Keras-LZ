@@ -209,6 +209,7 @@ bert_model = build_transformer_model(config_path, checkpoint_path,model = 'alber
 for l in bert_model.layers:
     l.trainable = True
 
+# sel_in,conn_in,csel, cop_in是标签，x1_in,x2_in,xm_in,h_in,hm_in
 
 x1_in = Input(shape=(None,), dtype='int32') # bert的问题文本输入 shape=(?,?)
 x2_in = Input(shape=(None,)) # bert的问题文本输入 shape=(?,?)
