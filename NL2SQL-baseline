@@ -316,16 +316,16 @@ def nl2sql(question, table):
     v_op = -1
     for i, j in enumerate(pcop[0, :len(question)+1].argmax(1)): # (?,?,5)  # (csel, v_op, v_strkeras
         # 这里结合标注和分类来预测条件
-        if j != num_op - 1:
-            if v_op != j:
-                if v_op != -1:
+        if j != num_op - 1: # 如果标记不等于None（num_op-1）
+            if v_op != j: #  j ！= -1
+                if v_op != -1: # v_op ！=-1
                     v_end = v_start + len(v_str)
                     csel = pcsel[0][v_start: v_end].mean(0).argmax()
                     conds.append((csel, v_op, v_str))
                 v_start = i
-                v_op = j
+                v_op = j  # v_op =j 为下一轮添加或者重新奠定基础
                 v_str = question[i - 1]
-            else:
+            else: # v_op==j 对应于326代码行
                 v_str += question[i - 1]
         elif v_op != -1:
             v_end = v_start + len(v_str)
