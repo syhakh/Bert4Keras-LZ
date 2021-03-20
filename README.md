@@ -1,10 +1,10 @@
 # Bert4Keras-LZ
 
 ###环境配置
->>tensorflow==1.14
->>keras==2.2.4
->>bert4keras==0.7.0
->>python=2.7/3.5
+>>tensorflow==1.14  
+>>keras==2.2.4  
+>>bert4keras==0.7.0  
+>>python=2.7/3.5  
 >>
 
 
