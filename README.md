@@ -1,8 +1,20 @@
 # Bert4Keras-LZ
 
+###环境配置
+>>tensorflow==1.14
+>>keras==2.2.4
+>>bert4keras==0.7.0
+>>python=2.7/3.5
+>>
 
-python = 2.7 \n
-Keras = 2.2.4 \n
-Tensorflow = 1.14.0 \n
-bert4keras = 0.7.0 \n
-AlBert 我们选取keras4bert中googleng官方选取albert.
+
+###数据集下载
+>>WikiSQL：https://github.com/salesforce/WikiSQL
+>>NL2SQL:None
+>>
+
+###文件运行
+>>python xxxxxxx.py
+>>
+
+###运行结果展示
